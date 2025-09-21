@@ -4,6 +4,7 @@ export const config = {
   GUILD_ID: process.env.GUILD_ID!,
   GAME_THREADS_CHANNEL_ID: process.env.GAME_THREADS_CHANNEL_ID!,
   GENERAL_CHANNEL_ID: process.env.GENERAL_CHANNEL_ID!,
+  MODERATOR_ROLE_ID: process.env.MODERATOR_ROLE_ID!,
 
   // Kansas State team ID on ESPN
   KSU_TEAM_ID: "2306",
@@ -20,7 +21,6 @@ export const config = {
 
   // Scheduling
   WEEKLY_REFRESH_CRON: "1 0 * * 0", // Sunday 12:01 AM ET
-  DAILY_CHECK_CRON: "0 5 * * *", // Every day 5:00 AM ET
   TIMEZONE: "America/New_York",
 };
 
@@ -30,6 +30,7 @@ const requiredEnvVars = [
   "GUILD_ID",
   "GAME_THREADS_CHANNEL_ID",
   "GENERAL_CHANNEL_ID",
+  "MODERATOR_ROLE_ID",
 ];
 
 for (const envVar of requiredEnvVars) {

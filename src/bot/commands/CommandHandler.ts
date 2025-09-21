@@ -53,6 +53,18 @@ export class CommandHandler {
   public async handleInteraction(interaction: any): Promise<void> {
     if (!interaction.isChatInputCommand()) return;
 
+    // Check for moderator role
+    const member = interaction.member;
+    const modRoleId = config.MODERATOR_ROLE_ID;
+    if (!member || !member.roles || !member.roles.cache?.has(modRoleId)) {
+      await interaction.reply({
+        content:
+          "You do not have permission to use this command. Moderator role required.",
+        ephemeral: true,
+      });
+      return;
+    }
+
     try {
       switch (interaction.commandName) {
         case "refresh-schedule":
