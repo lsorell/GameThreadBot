@@ -167,7 +167,7 @@ export class ThreadManager {
       `**Kansas State ${homeAway} ${opponent.displayName}**\n` +
       `📅 ${formattedDate}\n` +
       `⏰ ${formattedTime}\n\n` +
-      `Let's go Wildcats! 💜`
+      `Go Cats! 💜`
     );
   }
 

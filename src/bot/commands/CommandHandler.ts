@@ -184,8 +184,7 @@ export class CommandHandler {
             })
             .join("\n") || "No games scheduled for today"
         }\n\n` +
-        `⏰ **Next Scheduled Jobs:**\n` +
-        `• Daily check: Every day at 5:00 AM ET\n` +
+        `⏰ **Next Scheduled Check:**\n` +
         `• Weekly refresh: Sundays at 12:01 AM ET\n\n` +
         `✅ Bot is running normally`;
 
