@@ -159,33 +159,95 @@ export class CommandHandler {
 
     try {
       const todaysGames = await this.scheduleManager.getTodaysGames();
-      const gameCounters = {
-        football: this.scheduleManager.getGameCounter(config.SPORTS.FOOTBALL),
-        mensBasketball: this.scheduleManager.getGameCounter(
-          config.SPORTS.MENS_BASKETBALL
-        ),
-        womensBasketball: this.scheduleManager.getGameCounter(
-          config.SPORTS.WOMENS_BASKETBALL
-        ),
-      };
+      const sports = [
+        { key: config.SPORTS.FOOTBALL, name: "Football", emoji: "🏈" },
+        {
+          key: config.SPORTS.MENS_BASKETBALL,
+          name: "Men's Basketball",
+          emoji: "🏀",
+        },
+        {
+          key: config.SPORTS.WOMENS_BASKETBALL,
+          name: "Women's Basketball",
+          emoji: "🏀",
+        },
+      ];
+
+      // Gather upcoming games for each sport
+      let upcomingSection = "";
+      for (const { key, name, emoji } of sports) {
+        const schedule = await this.scheduleManager.getSchedule(key);
+        // Only future games (today or later)
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+        const futureGames = schedule.events.filter(
+          (g) => new Date(g.date) >= now
+        );
+        if (futureGames.length === 0) {
+          upcomingSection += `### ${emoji} ${name}:\n- No games scheduled\n`;
+        } else {
+          upcomingSection += `### ${emoji} ${name}:\n`;
+          futureGames.forEach((g, idx) => {
+            const gameDate = new Date(g.date);
+            const options: Intl.DateTimeFormatOptions = {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            };
+            const dateStr = gameDate.toLocaleDateString("en-US", options);
+            // Get opponent
+            const competition = g.competitions?.[0];
+            let ksuTeam = competition?.competitors?.find(
+              (comp) =>
+                comp.team?.displayName?.includes("Kansas State") ||
+                comp.team?.abbreviation === "KSU"
+            );
+            let opponent = competition?.competitors?.find(
+              (comp) => comp !== ksuTeam
+            );
+            let oppName = opponent?.team?.displayName || "Unknown";
+            let homeAway = ksuTeam?.homeAway === "home" ? "vs" : "@";
+            upcomingSection += `- Game ${
+              idx + 1
+            }: ${homeAway} ${oppName} on ${dateStr}\n`;
+          });
+        }
+        upcomingSection += "\n";
+      }
+
+      // Next scheduled refresh: next Sunday at 12:01 AM ET
+      function getNextSundayDate() {
+        const d = new Date();
+        const daysToAdd = (7 - d.getDay()) % 7 || 7;
+        d.setDate(d.getDate() + daysToAdd);
+        d.setHours(0, 1, 0, 0); // 12:01 AM
+        return d.toLocaleString("en-US", {
+          timeZone: "America/New_York",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        });
+      }
 
       const statusMessage =
-        `🤖 **Bot Status Report**\n\n` +
-        `📊 **Game Counters:**\n` +
-        `🏈 Football: ${gameCounters.football} games\n` +
-        `🏀 Men's Basketball: ${gameCounters.mensBasketball} games\n` +
-        `🏀 Women's Basketball: ${gameCounters.womensBasketball} games\n\n` +
-        `📅 **Today's Games:** ${todaysGames.length}\n` +
+        `# 🤖 Bot Status Report\n` +
+        `## 📊 Upcoming Games\n` +
+        upcomingSection +
+        `## 📅 Today's Games \n` +
         `${
           todaysGames
             .map(({ game, sport }) => {
               const opponent = this.extractOpponentName(game);
-              return `• ${sport}: vs ${opponent}`;
+              return `- ${sport}: vs ${opponent}`;
             })
             .join("\n") || "No games scheduled for today"
-        }\n\n` +
-        `⏰ **Next Scheduled Check:**\n` +
-        `• Weekly refresh: Sundays at 12:01 AM ET\n\n` +
+        }\n` +
+        `## ⏰ Next Scheduled Refresh\n` +
+        `- ${getNextSundayDate()}\n\n` +
         `✅ Bot is running normally`;
 
       await interaction.editReply(statusMessage);

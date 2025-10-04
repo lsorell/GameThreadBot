@@ -147,6 +147,7 @@ export class ThreadManager {
       hour: "numeric",
       minute: "2-digit",
       timeZoneName: "short",
+      timeZone: "America/Chicago",
     });
 
     const competition = game.competitions?.[0];
@@ -173,7 +174,11 @@ export class ThreadManager {
 
   private generateNotificationMessage(threadName: string, thread: any): string {
     const emoji = this.getSportEmojiFromThreadName(threadName);
-    return `${emoji} The game thread for **${threadName}** is now up! Head over to ${thread} to discuss the game. Let's go Wildcats! 💜`;
+    return (
+      `${emoji} The game thread for **${threadName}** is now up!\n` +
+      `Head over to ${thread} to discuss the game.\n` +
+      `Go Cats! 💜`
+    );
   }
 
   private getSportEmoji(sport: Sport): string {
