@@ -208,29 +208,24 @@ export class CommandHandler {
             );
             let oppName = opponent?.team?.displayName || "Unknown";
             let homeAway = ksuTeam?.homeAway === "home" ? "vs" : "@";
-            upcomingSection += `- Game ${
-              idx + 1
-            }: ${homeAway} ${oppName} on ${dateStr}\n`;
+            upcomingSection += `- ${homeAway} ${oppName} on ${dateStr}\n`;
           });
         }
-        upcomingSection += "\n";
       }
 
-      // Next scheduled refresh: next Sunday at 12:01 AM ET
       function getNextSundayDate() {
-        const d = new Date();
-        const daysToAdd = (7 - d.getDay()) % 7 || 7;
-        d.setDate(d.getDate() + daysToAdd);
-        d.setHours(0, 1, 0, 0); // 12:01 AM
-        return d.toLocaleString("en-US", {
-          timeZone: "America/New_York",
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: true,
-        });
+        const now = new Date();
+        const daysToAdd = 7 - now.getDay();
+        const nextSunday = new Date(now.getTime());
+        nextSunday.setDate(now.getDate() + daysToAdd);
+        return (
+          nextSunday.toLocaleString("en-US", {
+            timeZone: "America/New_York",
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          }) + " at 12:01 AM ET"
+        );
       }
 
       const statusMessage =
@@ -242,7 +237,13 @@ export class CommandHandler {
           todaysGames
             .map(({ game, sport }) => {
               const opponent = this.extractOpponentName(game);
-              return `- ${sport}: vs ${opponent}`;
+              let displaySport: string = sport;
+              if (sport === config.SPORTS.FOOTBALL) displaySport = "Football";
+              else if (sport === config.SPORTS.MENS_BASKETBALL)
+                displaySport = "Men's Basketball";
+              else if (sport === config.SPORTS.WOMENS_BASKETBALL)
+                displaySport = "Women's Basketball";
+              return `- ${displaySport}: vs ${opponent}`;
             })
             .join("\n") || "No games scheduled for today"
         }\n` +
