@@ -49,15 +49,20 @@ export class ESPNApiService {
     if (sport === config.SPORTS.FOOTBALL) {
       // Football season runs Aug-Jan, so:
       // Aug-Dec = current year season
-      // Jan-Jul = previous year season (since season started in previous year)
-      return currentMonth >= 8 ? currentYear : currentYear - 1;
-    } else {
-      // Basketball seasons run Nov-Mar, so:
-      // Nov-Dec = current year season
-      // Jan-Jul = current year season (season started in previous year but we use current year)
-      // Aug-Oct = previous year season (off-season, but if games exist, they'd be from previous season)
-      return currentMonth >= 8 ? currentYear : currentYear;
+      // Jan-Feb = previous year season (since season started in previous year)
+      return currentMonth <= 2 ? currentYear - 1 : currentYear;
     }
+    if (
+      sport === config.SPORTS.MENS_BASKETBALL ||
+      sport === config.SPORTS.WOMENS_BASKETBALL
+    ) {
+      // Basketball seasons run Oct-Mar, so:
+      // Oct-Dec = next year's season
+      // Jan-Jul = current year season (season started in previous year but we use current year)
+      return currentMonth >= 10 ? currentYear + 1 : currentYear;
+    }
+
+    return currentYear;
   }
 
   public async testConnection(): Promise<boolean> {
