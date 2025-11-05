@@ -121,7 +121,7 @@ export class ScheduleManager {
     const date = new Date(dateString);
     // node-cron: 'm h D M d' (d=day of week, not used here)
     // 5:00 AM: '0 5 D M *'
-    return `0 5 ${date.getUTCDate()} ${date.getUTCMonth() + 1} *`;
+    return `0 5 ${date.getDate()} ${date.getMonth() + 1} *`;
   }
 
   /**
