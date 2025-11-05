@@ -190,25 +190,12 @@ export class CommandHandler {
           futureGames.forEach((g, idx) => {
             const gameDate = new Date(g.date);
             const options: Intl.DateTimeFormatOptions = {
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric",
+              year: "2-digit",
+              month: "2-digit",
+              day: "2-digit",
             };
             const dateStr = gameDate.toLocaleDateString("en-US", options);
-            // Get opponent
-            const competition = g.competitions?.[0];
-            let ksuTeam = competition?.competitors?.find(
-              (comp) =>
-                comp.team?.displayName?.includes("Kansas State") ||
-                comp.team?.abbreviation === "KSU"
-            );
-            let opponent = competition?.competitors?.find(
-              (comp) => comp !== ksuTeam
-            );
-            let oppName = opponent?.team?.displayName || "Unknown";
-            let homeAway = ksuTeam?.homeAway === "home" ? "vs" : "@";
-            upcomingSection += `- ${homeAway} ${oppName} on ${dateStr}\n`;
+            upcomingSection += `- ${g.shortName} - ${dateStr}\n`;
           });
         }
       }

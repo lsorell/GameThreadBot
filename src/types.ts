@@ -5,6 +5,7 @@ export type Sport = (typeof config.SPORTS)[keyof typeof config.SPORTS];
 export interface Game {
   id: string;
   name: string;
+  shortName: string;
   date: string;
   competitions: Array<{
     id: string;
