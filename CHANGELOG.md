@@ -1,5 +1,9 @@
 # Version Changelog
 
+## 1.0.3
+
+- Fixed ScheduleManager so that it properly accounted for times games were scheduled. Some later in the day games got scheduled for the following day.
+
 ## 1.0.2
 
 - ScheduleManager was scheduling basketball games for the following day due to converting for UTC time. Used local time functions to fix the issue.

@@ -119,9 +119,18 @@ export class ScheduleManager {
    */
   private getCronTimeForGame(dateString: string): string {
     const date = new Date(dateString);
-    // node-cron: 'm h D M d' (d=day of week, not used here)
-    // 5:00 AM: '0 5 D M *'
-    return `0 5 ${date.getDate()} ${date.getMonth() + 1} *`;
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: config.TIMEZONE,
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+    });
+
+    const parts = formatter.formatToParts(date);
+    const day = parts.find((p) => p.type === "day")?.value;
+    const month = parts.find((p) => p.type === "month")?.value;
+
+    return `0 5 ${day} ${month} *`;
   }
 
   /**
