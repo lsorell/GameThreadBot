@@ -1,5 +1,9 @@
 # Version Changelog
 
+## 1.0.4
+
+- The bot-status command now also accounts for timezone when displaying date.
+
 ## 1.0.3
 
 - Fixed ScheduleManager so that it properly accounted for times games were scheduled. Some later in the day games got scheduled for the following day.
