@@ -220,8 +220,12 @@ export class ScheduleManager {
   public async getTodaysGames(): Promise<Array<{ game: any; sport: Sport }>> {
     const todaysGames: Array<{ game: any; sport: Sport }> = [];
     const sports = Object.values(config.SPORTS) as Sport[];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = new Date().toLocaleString("en-US", {
+      timeZone: config.TIMEZONE,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
 
     for (const sport of sports) {
       try {
@@ -229,9 +233,14 @@ export class ScheduleManager {
 
         for (const game of schedule.events) {
           const gameDate = new Date(game.date);
-          gameDate.setHours(0, 0, 0, 0);
+          const gameDateET = gameDate.toLocaleString("en-US", {
+            timeZone: config.TIMEZONE,
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+          });
 
-          if (gameDate.getTime() === today.getTime()) {
+          if (gameDateET === today) {
             todaysGames.push({ game, sport });
           }
         }

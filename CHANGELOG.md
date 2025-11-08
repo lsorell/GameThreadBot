@@ -1,5 +1,9 @@
 # Version Changelog
 
+## 1.0.5
+
+- The check-games-today command now also accounts for timezone when checking for games.
+
 ## 1.0.4
 
 - The bot-status command now also accounts for timezone when displaying date.
