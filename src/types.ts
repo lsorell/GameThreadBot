@@ -24,10 +24,6 @@ export interface ScheduleData {
   events: Game[];
 }
 
-export interface GameCounter {
-  [sport: string]: number;
-}
-
 export interface TodayGame {
   game: Game;
   sport: Sport;

@@ -4,9 +4,13 @@ import {
   ChatInputCommandInteraction,
   PermissionFlagsBits,
 } from "discord.js";
-import { ScheduleManager } from "../utils/ScheduleManager";
-import { ThreadManager } from "../utils/ThreadManager";
-import { config } from "../../config";
+import { ScheduleManager } from "../managers/ScheduleManager";
+import { ThreadManager } from "../managers/ThreadManager";
+import { config, SPORT_METADATA } from "../../config";
+import { extractOpponent } from "../../utils/gameUtils";
+import { logger } from "../../utils/logger";
+
+const LOG = "Command";
 
 export class CommandHandler {
   private scheduleManager: ScheduleManager;
@@ -21,16 +25,12 @@ export class CommandHandler {
     const commands = [
       new SlashCommandBuilder()
         .setName("refresh-schedule")
-        .setDescription(
-          "Manually refresh the game schedule and create pending threads",
-        )
+        .setDescription("Manually refresh the game schedule and create pending threads")
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
-
       new SlashCommandBuilder()
         .setName("check-games-today")
         .setDescription("Check for games today and create threads if needed")
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
-
       new SlashCommandBuilder()
         .setName("bot-status")
         .setDescription("Check the bot status and schedule information")
@@ -41,25 +41,22 @@ export class CommandHandler {
       const guild = client.guilds.cache.get(config.GUILD_ID);
       if (guild) {
         await guild.commands.set(commands.map((cmd) => cmd.toJSON()));
-        console.log("Slash commands registered successfully");
+        logger.info(LOG, "Slash commands registered");
       } else {
-        console.error(`Could not find guild with ID: ${config.GUILD_ID}`);
+        logger.error(LOG, `Could not find guild with ID: ${config.GUILD_ID}`);
       }
     } catch (error) {
-      console.error("Error registering slash commands:", error);
+      logger.error(LOG, "Error registering slash commands", error);
     }
   }
 
   public async handleInteraction(interaction: any): Promise<void> {
     if (!interaction.isChatInputCommand()) return;
 
-    // Check for moderator role
     const member = interaction.member;
-    const modRoleId = config.MODERATOR_ROLE_ID;
-    if (!member || !member.roles || !member.roles.cache?.has(modRoleId)) {
+    if (!member?.roles?.cache?.has(config.MODERATOR_ROLE_ID)) {
       await interaction.reply({
-        content:
-          "You do not have permission to use this command. Moderator role required.",
+        content: "You do not have permission to use this command. Moderator role required.",
         ephemeral: true,
       });
       return;
@@ -77,54 +74,36 @@ export class CommandHandler {
           await this.handleBotStatus(interaction);
           break;
         default:
-          await interaction.reply({
-            content: "Unknown command",
-            ephemeral: true,
-          });
+          await interaction.reply({ content: "Unknown command", ephemeral: true });
       }
     } catch (error) {
-      console.error("Error handling interaction:", error);
+      logger.error(LOG, `Error handling /${interaction.commandName}`, error);
 
-      const errorMessage =
-        "An error occurred while processing your command. Please check the console for details.";
-
+      const msg = "An error occurred while processing your command. Please check the console for details.";
       if (interaction.deferred) {
-        await interaction.editReply(errorMessage);
+        await interaction.editReply(msg);
       } else if (!interaction.replied) {
-        await interaction.reply({
-          content: errorMessage,
-          ephemeral: true,
-        });
+        await interaction.reply({ content: msg, ephemeral: true });
       }
     }
   }
 
-  private async handleRefreshSchedule(
-    interaction: ChatInputCommandInteraction,
-  ): Promise<void> {
+  private async handleRefreshSchedule(interaction: ChatInputCommandInteraction): Promise<void> {
     await interaction.deferReply({ ephemeral: true });
 
     try {
-      // Refresh all schedules and set up per-game cron jobs
       await this.scheduleManager.refreshAllSchedules(this.threadManager);
-      await interaction.editReply(
-        "✅ Schedule refreshed successfully for all sports!",
-      );
+      await interaction.editReply("✅ Schedule refreshed successfully for all sports!");
     } catch (error) {
-      console.error("Error refreshing schedule:", error);
-      await interaction.editReply(
-        "❌ Error refreshing schedule. Check console for details.",
-      );
+      logger.error(LOG, "Error refreshing schedule", error);
+      await interaction.editReply("❌ Error refreshing schedule. Check console for details.");
     }
   }
 
-  private async handleCheckGamesToday(
-    interaction: ChatInputCommandInteraction,
-  ): Promise<void> {
+  private async handleCheckGamesToday(interaction: ChatInputCommandInteraction): Promise<void> {
     await interaction.deferReply({ ephemeral: true });
 
     try {
-      // Get today's games
       const todaysGames = await this.scheduleManager.getTodaysGames();
       let scheduledCount = 0;
       for (const { game, sport } of todaysGames) {
@@ -133,44 +112,26 @@ export class CommandHandler {
           scheduledCount++;
         }
       }
-      // Run the thread check for today
-      const threadsCreated =
-        await this.threadManager.checkAndCreateTodayThreads();
+
+      const threadsCreated = await this.threadManager.checkAndCreateTodayThreads();
 
       let reply = `✅ Checked today's games. Created ${threadsCreated} thread(s).`;
-      if (scheduledCount > 0) {
-        reply += `\nScheduled ${scheduledCount} new game day cron job(s).`;
-      } else {
-        reply += `\nNo new game day cron jobs needed.`;
-      }
+      reply += scheduledCount > 0
+        ? `\nScheduled ${scheduledCount} new game day cron job(s).`
+        : `\nNo new game day cron jobs needed.`;
+
       await interaction.editReply(reply);
     } catch (error) {
-      console.error("Error checking today's games:", error);
-      await interaction.editReply(
-        "❌ Error checking today's games. Check console for details.",
-      );
+      logger.error(LOG, "Error checking today's games", error);
+      await interaction.editReply("❌ Error checking today's games. Check console for details.");
     }
   }
 
-  private async handleBotStatus(
-    interaction: ChatInputCommandInteraction,
-  ): Promise<void> {
+  private async handleBotStatus(interaction: ChatInputCommandInteraction): Promise<void> {
     await interaction.deferReply({ ephemeral: true });
 
     try {
-      const sports = [
-        { key: config.SPORTS.FOOTBALL, name: "Football", emoji: "🏈" },
-        {
-          key: config.SPORTS.MENS_BASKETBALL,
-          name: "Men's Basketball",
-          emoji: "🏀",
-        },
-        {
-          key: config.SPORTS.WOMENS_BASKETBALL,
-          name: "Women's Basketball",
-          emoji: "🏀",
-        },
-      ];
+      const sportEntries = Object.entries(SPORT_METADATA);
 
       const today = new Date().toLocaleString("en-US", {
         timeZone: config.TIMEZONE,
@@ -182,16 +143,15 @@ export class CommandHandler {
       let upcomingSection = "";
       let todaySection = "";
 
-      for (const { key, name, emoji } of sports) {
-        const sportGames = this.scheduleManager.getScheduledGamesBySport(key);
+      for (const [sportKey, meta] of sportEntries) {
+        const sportGames = this.scheduleManager.getScheduledGamesBySport(sportKey as any);
 
         if (sportGames.length === 0) {
-          upcomingSection += `### ${emoji} ${name}:\n- No games tracked\n`;
+          upcomingSection += `### ${meta.emoji} ${meta.displayName}:\n- No games tracked\n`;
         } else {
-          upcomingSection += `### ${emoji} ${name}:\n`;
+          upcomingSection += `### ${meta.emoji} ${meta.displayName}:\n`;
           for (const { game } of sportGames) {
-            const gameDate = new Date(game.date);
-            const dateStr = gameDate.toLocaleDateString("en-US", {
+            const dateStr = new Date(game.date).toLocaleDateString("en-US", {
               year: "2-digit",
               month: "2-digit",
               day: "2-digit",
@@ -212,62 +172,42 @@ export class CommandHandler {
         });
 
         for (const { game } of todayGames) {
-          const opponent = this.extractOpponentName(game);
-          todaySection += `- ${name}: vs ${opponent}\n`;
+          const opponent = extractOpponent(game);
+          todaySection += `- ${meta.displayName}: vs ${opponent?.displayName || "Unknown"}\n`;
         }
       }
 
-      function getNextSundayDate() {
-        const now = new Date();
-        const daysToAdd = 7 - now.getDay();
-        const nextSunday = new Date(now.getTime());
-        nextSunday.setDate(now.getDate() + daysToAdd);
-        return (
-          nextSunday.toLocaleString("en-US", {
-            timeZone: "America/New_York",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          }) + " at 12:01 AM ET"
-        );
-      }
+      const nextSunday = this.getNextSundayLabel();
 
       const statusMessage =
         `# 🤖 Bot Status Report\n` +
         `## 📊 Upcoming Games (Tracked)\n` +
         upcomingSection +
         `## 📅 Today's Games\n` +
-        `${todaySection || "No games scheduled for today"}\n` +
+        `${todaySection || "No games tracked for today"}\n` +
         `## ⏰ Next Scheduled Refresh\n` +
-        `- ${getNextSundayDate()}\n\n` +
+        `- ${nextSunday}\n\n` +
         `✅ Bot is running normally`;
 
       await interaction.editReply(statusMessage);
     } catch (error) {
-      console.error("Error getting bot status:", error);
-      await interaction.editReply(
-        "❌ Error retrieving bot status. Check console for details.",
-      );
+      logger.error(LOG, "Error getting bot status", error);
+      await interaction.editReply("❌ Error retrieving bot status. Check console for details.");
     }
   }
 
-  private extractOpponentName(game: any): string {
-    try {
-      const competition = game.competitions?.[0];
-      if (!competition) return "Unknown";
-
-      const ksuTeam = competition.competitors?.find(
-        (comp: any) =>
-          comp.team?.displayName?.includes("Kansas State") ||
-          comp.team?.abbreviation === "KSU",
-      );
-
-      const opponent = competition.competitors?.find(
-        (comp: any) => comp !== ksuTeam,
-      );
-      return opponent?.team?.displayName || "Unknown";
-    } catch {
-      return "Unknown";
-    }
+  private getNextSundayLabel(): string {
+    const now = new Date();
+    const daysToAdd = 7 - now.getDay();
+    const nextSunday = new Date(now.getTime());
+    nextSunday.setDate(now.getDate() + daysToAdd);
+    return (
+      nextSunday.toLocaleString("en-US", {
+        timeZone: "America/New_York",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      }) + " at 12:01 AM ET"
+    );
   }
 }

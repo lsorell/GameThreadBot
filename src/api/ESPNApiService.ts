@@ -1,41 +1,32 @@
 import axios from "axios";
-import { config } from "../config";
+import { config, SPORT_METADATA } from "../config";
 import { Sport, ScheduleData } from "../types";
+import { logger } from "../utils/logger";
+
+const LOG = "ESPNApi";
 
 export class ESPNApiService {
-  private readonly sportMap: Record<Sport, string> = {
-    [config.SPORTS.FOOTBALL]: "football/college-football",
-    [config.SPORTS.MENS_BASKETBALL]: "basketball/mens-college-basketball",
-    [config.SPORTS.WOMENS_BASKETBALL]: "basketball/womens-college-basketball",
-  };
-
   public async fetchSchedule(sport: Sport): Promise<ScheduleData> {
-    const espnSport = this.sportMap[sport];
-    if (!espnSport) {
+    const meta = SPORT_METADATA[sport];
+    if (!meta) {
       throw new Error(`Unknown sport: ${sport}`);
     }
 
     const season = this.getCurrentSeason(sport);
-    const url = `${config.ESPN_BASE_URL}/${espnSport}/teams/${config.KSU_TEAM_ID}/schedule?season=${season}`;
+    const url = `${config.ESPN_BASE_URL}/${meta.espnPath}/teams/${config.KSU_TEAM_ID}/schedule?season=${season}`;
 
     try {
-      console.log(`Fetching ${sport} schedule from: ${url}`);
+      logger.info(LOG, `Fetching ${sport} schedule (season ${season})`);
       const response = await axios.get(url, {
         timeout: 10000,
-        headers: {
-          "User-Agent": "3MAW-Discord-Bot/1.0",
-        },
+        headers: { "User-Agent": "3MAW-Discord-Bot/1.0" },
       });
 
-      return {
-        events: response.data.events || [],
-      };
+      return { events: response.data.events || [] };
     } catch (error) {
-      console.error(`Error fetching ${sport} schedule:`, error);
+      logger.error(LOG, `Error fetching ${sport} schedule`);
       if (axios.isAxiosError(error)) {
-        console.error(
-          `Status: ${error.response?.status}, Message: ${error.message}`
-        );
+        logger.error(LOG, `Status: ${error.response?.status}, Message: ${error.message}`);
       }
       return { events: [] };
     }
@@ -43,26 +34,22 @@ export class ESPNApiService {
 
   private getCurrentSeason(sport: Sport): number {
     const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1; // 1-based month
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
 
     if (sport === config.SPORTS.FOOTBALL) {
-      // Football season runs Aug-Jan, so:
-      // Aug-Dec = current year season
-      // Jan-Feb = previous year season (since season started in previous year)
-      return currentMonth <= 2 ? currentYear - 1 : currentYear;
+      // Football: Aug–Jan. Jan–Feb belongs to the previous year's season.
+      return month <= 2 ? year - 1 : year;
     }
     if (
       sport === config.SPORTS.MENS_BASKETBALL ||
       sport === config.SPORTS.WOMENS_BASKETBALL
     ) {
-      // Basketball seasons run Oct-Mar, so:
-      // Oct-Dec = next year's season
-      // Jan-Jul = current year season (season started in previous year but we use current year)
-      return currentMonth >= 10 ? currentYear + 1 : currentYear;
+      // Basketball: Oct–Mar. Oct–Dec uses next year as the season identifier.
+      return month >= 10 ? year + 1 : year;
     }
 
-    return currentYear;
+    return year;
   }
 
   public async testConnection(): Promise<boolean> {
@@ -71,7 +58,7 @@ export class ESPNApiService {
       const response = await axios.get(url, { timeout: 5000 });
       return response.status === 200;
     } catch (error) {
-      console.error("ESPN API connection test failed:", error);
+      logger.error(LOG, "ESPN API connection test failed", error);
       return false;
     }
   }

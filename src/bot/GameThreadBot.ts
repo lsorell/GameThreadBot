@@ -1,8 +1,11 @@
 import { Client, GatewayIntentBits } from "discord.js";
 import { CommandHandler } from "./commands/CommandHandler";
-import { ScheduleManager } from "./utils/ScheduleManager";
-import { ThreadManager } from "./utils/ThreadManager";
+import { ScheduleManager } from "./managers/ScheduleManager";
+import { ThreadManager } from "./managers/ThreadManager";
 import { config } from "../config";
+import { logger } from "../utils/logger";
+
+const LOG = "Bot";
 
 export class GameThreadBot {
   private client: Client;
@@ -23,7 +26,7 @@ export class GameThreadBot {
     this.threadManager = new ThreadManager(this.client, this.scheduleManager);
     this.commandHandler = new CommandHandler(
       this.scheduleManager,
-      this.threadManager
+      this.threadManager,
     );
 
     this.setupEventHandlers();
@@ -31,19 +34,17 @@ export class GameThreadBot {
 
   private setupEventHandlers(): void {
     this.client.once("ready", async () => {
-      console.log(`Bot logged in as ${this.client.user?.tag}`);
-
-      // Register commands
+      logger.info(LOG, `Logged in as ${this.client.user?.tag}`);
       await this.commandHandler.registerCommands(this.client);
-
-      // Start scheduled jobs
       this.scheduleManager.startScheduledJobs(this.threadManager);
-
-      console.log("Bot is ready and scheduled jobs are running!");
+      logger.info(LOG, "Ready — scheduled jobs running");
     });
 
     this.client.on("interactionCreate", async (interaction) => {
-      if (interaction.isButton() && interaction.customId.startsWith("join_thread_")) {
+      if (
+        interaction.isButton() &&
+        interaction.customId.startsWith("join_thread_")
+      ) {
         await this.threadManager.handleJoinThreadButton(interaction);
         return;
       }
@@ -57,7 +58,7 @@ export class GameThreadBot {
     });
 
     this.client.on("error", (error) => {
-      console.error("Discord client error:", error);
+      logger.error(LOG, "Discord client error", error);
     });
   }
 
@@ -65,7 +66,7 @@ export class GameThreadBot {
     try {
       await this.client.login(config.DISCORD_TOKEN);
     } catch (error) {
-      console.error("Error starting bot:", error);
+      logger.error(LOG, "Error starting bot", error);
       throw error;
     }
   }
@@ -73,5 +74,6 @@ export class GameThreadBot {
   public async stop(): Promise<void> {
     this.scheduleManager.stopScheduledJobs();
     this.client.destroy();
+    logger.info(LOG, "Bot stopped");
   }
 }
