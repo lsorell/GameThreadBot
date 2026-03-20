@@ -43,6 +43,10 @@ export class GameThreadBot {
     });
 
     this.client.on("interactionCreate", async (interaction) => {
+      if (interaction.isButton() && interaction.customId.startsWith("join_thread_")) {
+        await this.threadManager.handleJoinThreadButton(interaction);
+        return;
+      }
       await this.commandHandler.handleInteraction(interaction);
     });
 

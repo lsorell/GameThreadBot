@@ -4,6 +4,10 @@ import {
   AnyThreadChannel,
   ChannelType,
   ThreadAutoArchiveDuration,
+  ButtonBuilder,
+  ButtonStyle,
+  ActionRowBuilder,
+  ButtonInteraction,
 } from "discord.js";
 import { ScheduleManager } from "./ScheduleManager";
 import { config } from "../../config";
@@ -45,10 +49,10 @@ export class ThreadManager {
       }
 
       const gameThreadsChannel = this.client.channels.cache.get(
-        config.GAME_THREADS_CHANNEL_ID
+        config.GAME_THREADS_CHANNEL_ID,
       ) as TextChannel;
       const generalChannel = this.client.channels.cache.get(
-        config.GENERAL_CHANNEL_ID
+        config.GENERAL_CHANNEL_ID,
       ) as TextChannel;
 
       if (!gameThreadsChannel || !generalChannel) {
@@ -66,12 +70,12 @@ export class ThreadManager {
       const threadName = this.generateThreadName(
         sport,
         gameNumber,
-        opponent.displayName
+        opponent.displayName,
       );
 
       const threadExists = await this.checkThreadExists(
         gameThreadsChannel,
-        threadName
+        threadName,
       );
       if (threadExists) {
         console.log(`Thread already exists: ${threadName}`);
@@ -93,11 +97,12 @@ export class ThreadManager {
       const initialMessage = this.generateInitialMessage(game, sport, opponent);
       await thread.send({ content: initialMessage });
 
-      const notificationMessage = this.generateNotificationMessage(
-        threadName,
-        thread
-      );
-      await generalChannel.send({ content: notificationMessage });
+      const notificationMessage = this.generateNotificationMessage(threadName);
+      const threadButtons = this.buildThreadButtons(thread.id);
+      await generalChannel.send({
+        content: notificationMessage,
+        components: [threadButtons],
+      });
 
       console.log(`Created thread: ${threadName}`);
       return true;
@@ -116,14 +121,21 @@ export class ThreadManager {
     return map[sport] || "";
   }
 
-  public async sendGameStartNotification(game: any, sport: Sport): Promise<void> {
+  public async sendGameStartNotification(
+    game: any,
+    sport: Sport,
+  ): Promise<void> {
     const channelId = this.getSportChannelId(sport);
     if (!channelId) {
-      console.log(`No sport channel configured for ${sport}, skipping game start notification`);
+      console.log(
+        `No sport channel configured for ${sport}, skipping game start notification`,
+      );
       return;
     }
 
-    const sportChannel = this.client.channels.cache.get(channelId) as TextChannel;
+    const sportChannel = this.client.channels.cache.get(
+      channelId,
+    ) as TextChannel;
     if (!sportChannel) {
       console.error(`Could not find sport channel ${channelId} for ${sport}`);
       return;
@@ -132,19 +144,30 @@ export class ThreadManager {
     const opponent = this.extractOpponent(game);
     const opponentName = opponent?.displayName || "Unknown";
     const thread = this.createdThreads.get(game.id);
-    const threadLink = thread ? `${thread}` : "the game thread";
 
     const emoji = this.getSportEmoji(sport);
     const message =
       `${emoji} The game vs **${opponentName}** is starting!\n` +
-      `We'll be talking about the game here: ${threadLink}\n` +
+      `We'll be talking about the game in the game thread.\n` +
       `Go Cats! 💜`;
 
     try {
-      await sportChannel.send({ content: message });
+      const sendOptions: {
+        content: string;
+        components?: ActionRowBuilder<ButtonBuilder>[];
+      } = {
+        content: message,
+      };
+      if (thread) {
+        sendOptions.components = [this.buildThreadButtons(thread.id)];
+      }
+      await sportChannel.send(sendOptions);
       console.log(`Sent game start notification for ${sport} game ${game.id}`);
     } catch (error) {
-      console.error(`Error sending game start notification for ${sport}:`, error);
+      console.error(
+        `Error sending game start notification for ${sport}:`,
+        error,
+      );
     }
   }
 
@@ -155,11 +178,11 @@ export class ThreadManager {
     const ksuTeam = competition.competitors?.find(
       (comp: any) =>
         comp.team?.displayName?.includes("Kansas State") ||
-        comp.team?.abbreviation === "KSU"
+        comp.team?.abbreviation === "KSU",
     );
 
     const opponent = competition.competitors?.find(
-      (comp: any) => comp !== ksuTeam
+      (comp: any) => comp !== ksuTeam,
     );
     return opponent?.team || null;
   }
@@ -167,7 +190,7 @@ export class ThreadManager {
   private generateThreadName(
     sport: Sport,
     gameNumber: number,
-    opponentName: string
+    opponentName: string,
   ): string {
     const sportDisplayNames: Record<Sport, string> = {
       [config.SPORTS.FOOTBALL]: "Football",
@@ -182,7 +205,7 @@ export class ThreadManager {
   private generateInitialMessage(
     game: any,
     sport: Sport,
-    opponent: any
+    opponent: any,
   ): string {
     const gameDate = new Date(game.date);
     const formattedDate = gameDate.toLocaleDateString("en-US", {
@@ -202,13 +225,13 @@ export class ThreadManager {
     const ksuTeam = competition?.competitors?.find(
       (comp: any) =>
         comp.team?.displayName?.includes("Kansas State") ||
-        comp.team?.abbreviation === "KSU"
+        comp.team?.abbreviation === "KSU",
     );
     const homeAway = ksuTeam?.homeAway === "home" ? "vs" : "@";
 
     const sportEmoji = this.getSportEmoji(sport);
     const sportDisplayName = this.generateThreadName(sport, 0, "").split(
-      " Game"
+      " Game",
     )[0];
 
     return (
@@ -220,13 +243,60 @@ export class ThreadManager {
     );
   }
 
-  private generateNotificationMessage(threadName: string, thread: any): string {
+  private generateNotificationMessage(threadName: string): string {
     const emoji = this.getSportEmojiFromThreadName(threadName);
     return (
       `${emoji} The game thread for **${threadName}** is now up!\n` +
-      `Head over to ${thread} to discuss the game.\n` +
       `Go Cats! 💜`
     );
+  }
+
+  private buildThreadButtons(
+    threadId: string,
+  ): ActionRowBuilder<ButtonBuilder> {
+    const joinButton = new ButtonBuilder()
+      .setCustomId(`join_thread_${threadId}`)
+      .setLabel("Join Thread")
+      .setStyle(ButtonStyle.Primary)
+      .setEmoji("💬");
+
+    const openButton = new ButtonBuilder()
+      .setURL(`https://discord.com/channels/${config.GUILD_ID}/${threadId}`)
+      .setLabel("Open Thread")
+      .setStyle(ButtonStyle.Link)
+      .setEmoji("🔗");
+
+    return new ActionRowBuilder<ButtonBuilder>().addComponents(
+      joinButton,
+      openButton,
+    );
+  }
+
+  public async handleJoinThreadButton(
+    interaction: ButtonInteraction,
+  ): Promise<void> {
+    const threadId = interaction.customId.replace("join_thread_", "");
+    try {
+      const thread = await this.client.channels.fetch(threadId);
+      if (!thread?.isThread()) {
+        await interaction.reply({
+          content: "Could not find that thread.",
+          ephemeral: true,
+        });
+        return;
+      }
+      await thread.members.add(interaction.user.id);
+      await interaction.reply({
+        content: `You've joined **${thread.name}**! Head over to <#${threadId}> to chat.`,
+        ephemeral: true,
+      });
+    } catch (error) {
+      console.error("Error handling join thread button:", error);
+      await interaction.reply({
+        content: `Something went wrong joining the thread. Please try joining manually here: <#${threadId}>.`,
+        ephemeral: true,
+      });
+    }
   }
 
   private getSportEmoji(sport: Sport): string {
@@ -246,7 +316,7 @@ export class ThreadManager {
 
   private async checkThreadExists(
     channel: TextChannel,
-    threadName: string
+    threadName: string,
   ): Promise<boolean> {
     try {
       const activeThreads = await channel.threads.fetchActive();
