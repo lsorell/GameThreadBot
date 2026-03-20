@@ -13,6 +13,7 @@ export class ScheduleManager {
   };
   private weeklyTask?: cron.ScheduledTask;
   private gameDayTasks: Map<string, cron.ScheduledTask> = new Map();
+  private gameStartTasks: Map<string, cron.ScheduledTask> = new Map();
   private scheduledGames: Map<string, { game: any; sport: Sport }> = new Map();
 
   constructor() {
@@ -44,11 +45,14 @@ export class ScheduleManager {
       this.weeklyTask.stop();
       this.weeklyTask = undefined;
     }
-    // Stop and clear all gameDayTasks
     for (const task of this.gameDayTasks.values()) {
       task.stop();
     }
     this.gameDayTasks.clear();
+    for (const task of this.gameStartTasks.values()) {
+      task.stop();
+    }
+    this.gameStartTasks.clear();
     console.log("Scheduled jobs stopped");
   }
 
@@ -77,25 +81,49 @@ export class ScheduleManager {
             const key = this.getGameTaskKey(sport, game.id);
             validKeys.add(key);
             this.scheduledGames.set(key, { game, sport });
-            if (!this.gameDayTasks.has(key) && threadManager) {
-              const cronTime = this.getCronTimeForGame(game.date);
-              const task = cron.schedule(
-                cronTime,
-                async () => {
-                  console.log(
-                    `Running game day thread check for ${sport} game ${game.id}`
+            if (threadManager) {
+              if (!this.gameDayTasks.has(key)) {
+                const cronTime = this.getCronTimeForGame(game.date);
+                const task = cron.schedule(
+                  cronTime,
+                  async () => {
+                    console.log(
+                      `Running game day thread check for ${sport} game ${game.id}`
+                    );
+                    await threadManager.checkAndCreateTodayThreads();
+                  },
+                  {
+                    scheduled: true,
+                    timezone: config.TIMEZONE,
+                  }
+                );
+                this.gameDayTasks.set(key, task);
+                console.log(
+                  `Scheduled game day job for ${sport} game ${game.id} at ${cronTime}`
+                );
+              }
+              if (!this.gameStartTasks.has(key)) {
+                const startCron = this.getCronTimeForGameStart(game.date);
+                if (startCron) {
+                  const task = cron.schedule(
+                    startCron,
+                    async () => {
+                      console.log(
+                        `Running game start notification for ${sport} game ${game.id}`
+                      );
+                      await threadManager.sendGameStartNotification(game, sport);
+                    },
+                    {
+                      scheduled: true,
+                      timezone: config.TIMEZONE,
+                    }
                   );
-                  await threadManager.checkAndCreateTodayThreads();
-                },
-                {
-                  scheduled: true,
-                  timezone: config.TIMEZONE,
+                  this.gameStartTasks.set(key, task);
+                  console.log(
+                    `Scheduled game start notification for ${sport} game ${game.id} at ${startCron}`
+                  );
                 }
-              );
-              this.gameDayTasks.set(key, task);
-              console.log(
-                `Scheduled game day job for ${sport} game ${game.id} at ${cronTime}`
-              );
+              }
             }
           }
         }
@@ -105,11 +133,12 @@ export class ScheduleManager {
     }
     for (const key of Array.from(this.gameDayTasks.keys())) {
       if (!validKeys.has(key)) {
-        const task = this.gameDayTasks.get(key);
-        if (task) task.stop();
+        this.gameDayTasks.get(key)?.stop();
         this.gameDayTasks.delete(key);
+        this.gameStartTasks.get(key)?.stop();
+        this.gameStartTasks.delete(key);
         this.scheduledGames.delete(key);
-        console.log(`Removed obsolete game day job: ${key}`);
+        console.log(`Removed obsolete game jobs: ${key}`);
       }
     }
   }
@@ -128,6 +157,30 @@ export class ScheduleManager {
     const month = parts.find((p) => p.type === "month")?.value;
 
     return `0 ${config.GAME_DAY_THREAD_HOUR} ${day} ${month} *`;
+  }
+
+  private getCronTimeForGameStart(dateString: string): string | null {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return null;
+
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: config.TIMEZONE,
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      hour: "numeric",
+      minute: "numeric",
+      hour12: false,
+    });
+
+    const parts = formatter.formatToParts(date);
+    const month = parts.find((p) => p.type === "month")?.value;
+    const day = parts.find((p) => p.type === "day")?.value;
+    const hour = parts.find((p) => p.type === "hour")?.value;
+    const minute = parts.find((p) => p.type === "minute")?.value;
+
+    if (!month || !day || !hour || !minute) return null;
+    return `${minute} ${hour} ${day} ${month} *`;
   }
 
   /**
@@ -155,6 +208,7 @@ export class ScheduleManager {
   ): boolean {
     const key = this.getGameTaskKey(sport, game.id);
     if (this.gameDayTasks.has(key)) return false;
+
     const cronTime = this.getCronTimeForGame(game.date);
     const task = cron.schedule(
       cronTime,
@@ -174,6 +228,30 @@ export class ScheduleManager {
     console.log(
       `Scheduled game day job for ${sport} game ${game.id} at ${cronTime}`
     );
+
+    if (!this.gameStartTasks.has(key)) {
+      const startCron = this.getCronTimeForGameStart(game.date);
+      if (startCron) {
+        const startTask = cron.schedule(
+          startCron,
+          async () => {
+            console.log(
+              `Running game start notification for ${sport} game ${game.id}`
+            );
+            await threadManager.sendGameStartNotification(game, sport);
+          },
+          {
+            scheduled: true,
+            timezone: config.TIMEZONE,
+          }
+        );
+        this.gameStartTasks.set(key, startTask);
+        console.log(
+          `Scheduled game start notification for ${sport} game ${game.id} at ${startCron}`
+        );
+      }
+    }
+
     return true;
   }
 

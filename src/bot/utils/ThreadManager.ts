@@ -1,6 +1,7 @@
 import {
   Client,
   TextChannel,
+  AnyThreadChannel,
   ChannelType,
   ThreadAutoArchiveDuration,
 } from "discord.js";
@@ -12,6 +13,7 @@ export class ThreadManager {
   private client: Client;
   private scheduleManager: ScheduleManager;
   private createdGameIds: Set<string> = new Set();
+  private createdThreads: Map<string, AnyThreadChannel> = new Map();
 
   constructor(client: Client, scheduleManager: ScheduleManager) {
     this.client = client;
@@ -86,6 +88,7 @@ export class ThreadManager {
 
       this.scheduleManager.incrementGameCounter(sport);
       this.createdGameIds.add(game.id);
+      this.createdThreads.set(game.id, thread);
 
       const initialMessage = this.generateInitialMessage(game, sport, opponent);
       await thread.send({ content: initialMessage });
@@ -101,6 +104,47 @@ export class ThreadManager {
     } catch (error) {
       console.error("Error creating game thread:", error);
       return false;
+    }
+  }
+
+  private getSportChannelId(sport: Sport): string {
+    const map: Record<Sport, string> = {
+      [config.SPORTS.FOOTBALL]: config.FOOTBALL_CHANNEL_ID,
+      [config.SPORTS.MENS_BASKETBALL]: config.MBB_CHANNEL_ID,
+      [config.SPORTS.WOMENS_BASKETBALL]: config.WBB_CHANNEL_ID,
+    };
+    return map[sport] || "";
+  }
+
+  public async sendGameStartNotification(game: any, sport: Sport): Promise<void> {
+    const channelId = this.getSportChannelId(sport);
+    if (!channelId) {
+      console.log(`No sport channel configured for ${sport}, skipping game start notification`);
+      return;
+    }
+
+    const sportChannel = this.client.channels.cache.get(channelId) as TextChannel;
+    if (!sportChannel) {
+      console.error(`Could not find sport channel ${channelId} for ${sport}`);
+      return;
+    }
+
+    const opponent = this.extractOpponent(game);
+    const opponentName = opponent?.displayName || "Unknown";
+    const thread = this.createdThreads.get(game.id);
+    const threadLink = thread ? `${thread}` : "the game thread";
+
+    const emoji = this.getSportEmoji(sport);
+    const message =
+      `${emoji} The game vs **${opponentName}** is starting!\n` +
+      `We'll be talking about the game here: ${threadLink}\n` +
+      `Go Cats! 💜`;
+
+    try {
+      await sportChannel.send({ content: message });
+      console.log(`Sent game start notification for ${sport} game ${game.id}`);
+    } catch (error) {
+      console.error(`Error sending game start notification for ${sport}:`, error);
     }
   }
 

@@ -6,6 +6,11 @@ export const config = {
   GENERAL_CHANNEL_ID: process.env.GENERAL_CHANNEL_ID!,
   MODERATOR_ROLE_ID: process.env.MODERATOR_ROLE_ID!,
 
+  // Sport-specific channel IDs (optional — game-time alerts skip if unset)
+  FOOTBALL_CHANNEL_ID: process.env.FOOTBALL_CHANNEL_ID || "",
+  MBB_CHANNEL_ID: process.env.MBB_CHANNEL_ID || "",
+  WBB_CHANNEL_ID: process.env.WBB_CHANNEL_ID || "",
+
   // Kansas State team ID on ESPN
   KSU_TEAM_ID: "2306",
 
@@ -24,6 +29,7 @@ export const config = {
   GAME_DAY_THREAD_HOUR: 8, // 8:00 AM ET = 7:00 AM CT
   TIMEZONE: "America/New_York",
 };
+
 
 // Validate required environment variables
 const requiredEnvVars = [
