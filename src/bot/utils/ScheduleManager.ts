@@ -114,9 +114,6 @@ export class ScheduleManager {
     }
   }
 
-  /**
-   * Returns a cron string for 5:00 AM ET on the date of the game.
-   */
   private getCronTimeForGame(dateString: string): string {
     const date = new Date(dateString);
     const formatter = new Intl.DateTimeFormat("en-US", {
@@ -130,7 +127,7 @@ export class ScheduleManager {
     const day = parts.find((p) => p.type === "day")?.value;
     const month = parts.find((p) => p.type === "month")?.value;
 
-    return `0 5 ${day} ${month} *`;
+    return `0 ${config.GAME_DAY_THREAD_HOUR} ${day} ${month} *`;
   }
 
   /**

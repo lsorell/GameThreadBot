@@ -21,6 +21,7 @@ export const config = {
 
   // Scheduling
   WEEKLY_REFRESH_CRON: "1 0 * * 0", // Sunday 12:01 AM ET
+  GAME_DAY_THREAD_HOUR: 8, // 8:00 AM ET = 7:00 AM CT
   TIMEZONE: "America/New_York",
 };
 
