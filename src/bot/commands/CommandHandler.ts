@@ -22,7 +22,7 @@ export class CommandHandler {
       new SlashCommandBuilder()
         .setName("refresh-schedule")
         .setDescription(
-          "Manually refresh the game schedule and create pending threads"
+          "Manually refresh the game schedule and create pending threads",
         )
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
 
@@ -100,7 +100,7 @@ export class CommandHandler {
   }
 
   private async handleRefreshSchedule(
-    interaction: ChatInputCommandInteraction
+    interaction: ChatInputCommandInteraction,
   ): Promise<void> {
     await interaction.deferReply({ ephemeral: true });
 
@@ -108,18 +108,18 @@ export class CommandHandler {
       // Refresh all schedules and set up per-game cron jobs
       await this.scheduleManager.refreshAllSchedules(this.threadManager);
       await interaction.editReply(
-        "✅ Schedule refreshed successfully for all sports!"
+        "✅ Schedule refreshed successfully for all sports!",
       );
     } catch (error) {
       console.error("Error refreshing schedule:", error);
       await interaction.editReply(
-        "❌ Error refreshing schedule. Check console for details."
+        "❌ Error refreshing schedule. Check console for details.",
       );
     }
   }
 
   private async handleCheckGamesToday(
-    interaction: ChatInputCommandInteraction
+    interaction: ChatInputCommandInteraction,
   ): Promise<void> {
     await interaction.deferReply({ ephemeral: true });
 
@@ -147,18 +147,17 @@ export class CommandHandler {
     } catch (error) {
       console.error("Error checking today's games:", error);
       await interaction.editReply(
-        "❌ Error checking today's games. Check console for details."
+        "❌ Error checking today's games. Check console for details.",
       );
     }
   }
 
   private async handleBotStatus(
-    interaction: ChatInputCommandInteraction
+    interaction: ChatInputCommandInteraction,
   ): Promise<void> {
     await interaction.deferReply({ ephemeral: true });
 
     try {
-      const todaysGames = await this.scheduleManager.getTodaysGames();
       const sports = [
         { key: config.SPORTS.FOOTBALL, name: "Football", emoji: "🏈" },
         {
@@ -173,31 +172,48 @@ export class CommandHandler {
         },
       ];
 
-      // Gather upcoming games for each sport
+      const today = new Date().toLocaleString("en-US", {
+        timeZone: config.TIMEZONE,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      });
+
       let upcomingSection = "";
+      let todaySection = "";
+
       for (const { key, name, emoji } of sports) {
-        const schedule = await this.scheduleManager.getSchedule(key);
-        // Only future games (today or later)
-        const now = new Date();
-        now.setHours(0, 0, 0, 0);
-        const futureGames = schedule.events.filter(
-          (g) => new Date(g.date) >= now
-        );
-        if (futureGames.length === 0) {
-          upcomingSection += `### ${emoji} ${name}:\n- No games scheduled\n`;
+        const sportGames = this.scheduleManager.getScheduledGamesBySport(key);
+
+        if (sportGames.length === 0) {
+          upcomingSection += `### ${emoji} ${name}:\n- No games tracked\n`;
         } else {
           upcomingSection += `### ${emoji} ${name}:\n`;
-          futureGames.forEach((g, idx) => {
-            const gameDate = new Date(g.date);
-            const options: Intl.DateTimeFormatOptions = {
+          for (const { game } of sportGames) {
+            const gameDate = new Date(game.date);
+            const dateStr = gameDate.toLocaleDateString("en-US", {
               year: "2-digit",
               month: "2-digit",
               day: "2-digit",
               timeZone: config.TIMEZONE,
-            };
-            const dateStr = gameDate.toLocaleDateString("en-US", options);
-            upcomingSection += `- ${g.shortName} - ${dateStr}\n`;
+            });
+            upcomingSection += `- ${game.shortName} - ${dateStr}\n`;
+          }
+        }
+
+        const todayGames = sportGames.filter(({ game }) => {
+          const gameDateStr = new Date(game.date).toLocaleString("en-US", {
+            timeZone: config.TIMEZONE,
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
           });
+          return gameDateStr === today;
+        });
+
+        for (const { game } of todayGames) {
+          const opponent = this.extractOpponentName(game);
+          todaySection += `- ${name}: vs ${opponent}\n`;
         }
       }
 
@@ -218,23 +234,10 @@ export class CommandHandler {
 
       const statusMessage =
         `# 🤖 Bot Status Report\n` +
-        `## 📊 Upcoming Games\n` +
+        `## 📊 Upcoming Games (Tracked)\n` +
         upcomingSection +
-        `## 📅 Today's Games \n` +
-        `${
-          todaysGames
-            .map(({ game, sport }) => {
-              const opponent = this.extractOpponentName(game);
-              let displaySport: string = sport;
-              if (sport === config.SPORTS.FOOTBALL) displaySport = "Football";
-              else if (sport === config.SPORTS.MENS_BASKETBALL)
-                displaySport = "Men's Basketball";
-              else if (sport === config.SPORTS.WOMENS_BASKETBALL)
-                displaySport = "Women's Basketball";
-              return `- ${displaySport}: vs ${opponent}`;
-            })
-            .join("\n") || "No games scheduled for today"
-        }\n` +
+        `## 📅 Today's Games\n` +
+        `${todaySection || "No games scheduled for today"}\n` +
         `## ⏰ Next Scheduled Refresh\n` +
         `- ${getNextSundayDate()}\n\n` +
         `✅ Bot is running normally`;
@@ -243,7 +246,7 @@ export class CommandHandler {
     } catch (error) {
       console.error("Error getting bot status:", error);
       await interaction.editReply(
-        "❌ Error retrieving bot status. Check console for details."
+        "❌ Error retrieving bot status. Check console for details.",
       );
     }
   }
@@ -256,11 +259,11 @@ export class CommandHandler {
       const ksuTeam = competition.competitors?.find(
         (comp: any) =>
           comp.team?.displayName?.includes("Kansas State") ||
-          comp.team?.abbreviation === "KSU"
+          comp.team?.abbreviation === "KSU",
       );
 
       const opponent = competition.competitors?.find(
-        (comp: any) => comp !== ksuTeam
+        (comp: any) => comp !== ksuTeam,
       );
       return opponent?.team?.displayName || "Unknown";
     } catch {

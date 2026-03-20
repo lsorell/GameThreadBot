@@ -12,8 +12,8 @@ export class ScheduleManager {
     [config.SPORTS.WOMENS_BASKETBALL]: 0,
   };
   private weeklyTask?: cron.ScheduledTask;
-  // Map key: `${sport}_${gameId}`
   private gameDayTasks: Map<string, cron.ScheduledTask> = new Map();
+  private scheduledGames: Map<string, { game: any; sport: Sport }> = new Map();
 
   constructor() {
     this.espnApi = new ESPNApiService();
@@ -76,8 +76,8 @@ export class ScheduleManager {
           if (gameDate >= now) {
             const key = this.getGameTaskKey(sport, game.id);
             validKeys.add(key);
+            this.scheduledGames.set(key, { game, sport });
             if (!this.gameDayTasks.has(key) && threadManager) {
-              // Schedule at 5:00 AM ET on game day
               const cronTime = this.getCronTimeForGame(game.date);
               const task = cron.schedule(
                 cronTime,
@@ -103,12 +103,12 @@ export class ScheduleManager {
         console.error(`Error refreshing ${sport} schedule:`, error);
       }
     }
-    // Remove obsolete jobs
     for (const key of Array.from(this.gameDayTasks.keys())) {
       if (!validKeys.has(key)) {
         const task = this.gameDayTasks.get(key);
         if (task) task.stop();
         this.gameDayTasks.delete(key);
+        this.scheduledGames.delete(key);
         console.log(`Removed obsolete game day job: ${key}`);
       }
     }
@@ -173,6 +173,7 @@ export class ScheduleManager {
       }
     );
     this.gameDayTasks.set(key, task);
+    this.scheduledGames.set(key, { game, sport });
     console.log(
       `Scheduled game day job for ${sport} game ${game.id} at ${cronTime}`
     );
@@ -215,6 +216,14 @@ export class ScheduleManager {
   public incrementGameCounter(sport: Sport): number {
     this.gameCounters[sport]++;
     return this.gameCounters[sport];
+  }
+
+  public getScheduledGames(): Array<{ game: any; sport: Sport }> {
+    return Array.from(this.scheduledGames.values());
+  }
+
+  public getScheduledGamesBySport(sport: Sport): Array<{ game: any; sport: Sport }> {
+    return this.getScheduledGames().filter((entry) => entry.sport === sport);
   }
 
   public async getTodaysGames(): Promise<Array<{ game: any; sport: Sport }>> {

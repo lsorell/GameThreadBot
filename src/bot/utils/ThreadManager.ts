@@ -11,6 +11,7 @@ import { Sport } from "../../types";
 export class ThreadManager {
   private client: Client;
   private scheduleManager: ScheduleManager;
+  private createdGameIds: Set<string> = new Set();
 
   constructor(client: Client, scheduleManager: ScheduleManager) {
     this.client = client;
@@ -36,6 +37,11 @@ export class ThreadManager {
 
   public async createGameThread(game: any, sport: Sport): Promise<boolean> {
     try {
+      if (this.createdGameIds.has(game.id)) {
+        console.log(`Thread already created for game ${game.id}, skipping`);
+        return false;
+      }
+
       const gameThreadsChannel = this.client.channels.cache.get(
         config.GAME_THREADS_CHANNEL_ID
       ) as TextChannel;
@@ -48,32 +54,29 @@ export class ThreadManager {
         return false;
       }
 
-      // Get opponent information
       const opponent = this.extractOpponent(game);
       if (!opponent) {
         console.error("Could not find opponent for game:", game.name);
         return false;
       }
 
-      // Generate thread name
-      const gameNumber = this.scheduleManager.incrementGameCounter(sport);
+      const gameNumber = this.scheduleManager.getGameCounter(sport) + 1;
       const threadName = this.generateThreadName(
         sport,
         gameNumber,
         opponent.displayName
       );
 
-      // Check if thread already exists
       const threadExists = await this.checkThreadExists(
         gameThreadsChannel,
         threadName
       );
       if (threadExists) {
         console.log(`Thread already exists: ${threadName}`);
+        this.createdGameIds.add(game.id);
         return false;
       }
 
-      // Create the thread
       const thread = await gameThreadsChannel.threads.create({
         name: threadName,
         autoArchiveDuration: ThreadAutoArchiveDuration.OneDay,
@@ -81,11 +84,12 @@ export class ThreadManager {
         reason: `Automated game thread for ${opponent.displayName} game`,
       });
 
-      // Send initial message in thread
+      this.scheduleManager.incrementGameCounter(sport);
+      this.createdGameIds.add(game.id);
+
       const initialMessage = this.generateInitialMessage(game, sport, opponent);
       await thread.send({ content: initialMessage });
 
-      // Send notification in general channel
       const notificationMessage = this.generateNotificationMessage(
         threadName,
         thread
