@@ -299,6 +299,41 @@ export class ThreadManager {
     }
   }
 
+  public async handleThreadLocked(thread: AnyThreadChannel): Promise<void> {
+    if (thread.parentId !== config.GAME_THREADS_CHANNEL_ID) return;
+
+    const sport = this.detectSportFromThreadName(thread.name);
+    if (!sport) {
+      console.log(`Could not determine sport for locked thread: ${thread.name}`);
+      return;
+    }
+
+    const channelId = this.getSportChannelId(sport);
+    if (!channelId) {
+      console.log(`No sport channel configured for ${sport}, skipping lock message`);
+      return;
+    }
+
+    const emoji = this.getSportEmoji(sport);
+    const message =
+      `🔒 A mod has locked the thread.\n` +
+      `${emoji} Move over to <#${channelId}> for the postgame discussion!`;
+
+    try {
+      await thread.send({ content: message });
+      console.log(`Sent lock redirect message in thread: ${thread.name}`);
+    } catch (error) {
+      console.error(`Error sending lock redirect message in ${thread.name}:`, error);
+    }
+  }
+
+  private detectSportFromThreadName(threadName: string): Sport | null {
+    if (threadName.startsWith("Football")) return config.SPORTS.FOOTBALL;
+    if (threadName.startsWith("Men's Basketball")) return config.SPORTS.MENS_BASKETBALL;
+    if (threadName.startsWith("Women's Basketball")) return config.SPORTS.WOMENS_BASKETBALL;
+    return null;
+  }
+
   private getSportEmoji(sport: Sport): string {
     const emojiMap: Record<Sport, string> = {
       [config.SPORTS.FOOTBALL]: "🏈",

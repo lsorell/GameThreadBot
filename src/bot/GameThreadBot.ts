@@ -50,6 +50,12 @@ export class GameThreadBot {
       await this.commandHandler.handleInteraction(interaction);
     });
 
+    this.client.on("threadUpdate", async (oldThread, newThread) => {
+      if (!oldThread.locked && newThread.locked) {
+        await this.threadManager.handleThreadLocked(newThread);
+      }
+    });
+
     this.client.on("error", (error) => {
       console.error("Discord client error:", error);
     });
