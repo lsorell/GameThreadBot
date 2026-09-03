@@ -2,14 +2,26 @@ import axios from "axios";
 import { config, SPORT_METADATA } from "../config";
 import { Sport, ScheduleData } from "../types";
 import { logger } from "../utils/logger";
+import footballSchedule from "../data/football-schedule-2306-2026.json";
 
 const LOG = "ESPNApi";
+
+// Temporary fallback to local file while figuring out how to self host
+const LOCAL_FALLBACK: Partial<Record<Sport, ScheduleData>> = {
+  [config.SPORTS.FOOTBALL]: { events: footballSchedule.events || [] },
+};
 
 export class ESPNApiService {
   public async fetchSchedule(sport: Sport): Promise<ScheduleData> {
     const meta = SPORT_METADATA[sport];
     if (!meta) {
       throw new Error(`Unknown sport: ${sport}`);
+    }
+
+    const fallback = LOCAL_FALLBACK[sport];
+    if (fallback) {
+      logger.info(LOG, `Using local fallback file for ${sport} schedule`);
+      return fallback;
     }
 
     const season = this.getCurrentSeason(sport);
@@ -26,7 +38,10 @@ export class ESPNApiService {
     } catch (error) {
       logger.error(LOG, `Error fetching ${sport} schedule`);
       if (axios.isAxiosError(error)) {
-        logger.error(LOG, `Status: ${error.response?.status}, Message: ${error.message}`);
+        logger.error(
+          LOG,
+          `Status: ${error.response?.status}, Message: ${error.message}`,
+        );
       }
       return { events: [] };
     }

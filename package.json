@@ -1,6 +1,6 @@
 {
   "name": "3maw-discord-bot",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Discord bot for automating Kansas State athletics game threads",
   "main": "dist/index.js",
   "scripts": {

@@ -1,5 +1,9 @@
 # Version Changelog
 
+## 1.0.6
+
+- Added a local copy of espn's api json since railway IP appears to be banned (403s). This is a temp workaround while I figure out how to self host
+
 ## 1.0.5
 
 - The check-games-today command now also accounts for timezone when checking for games.
