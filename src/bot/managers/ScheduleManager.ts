@@ -53,25 +53,53 @@ export class ScheduleManager {
     logger.info(LOG, "Scheduled jobs stopped");
   }
 
-  public async refreshAllSchedules(threadManager?: ThreadManager): Promise<void> {
+  public async refreshAllSchedules(
+    threadManager?: ThreadManager,
+  ): Promise<void> {
     const sports = Object.values(config.SPORTS) as Sport[];
     const validKeys = new Set<string>();
 
     for (const sport of sports) {
       try {
-        await this.refreshSportSchedule(sport);
         const schedule = await this.espnApi.fetchSchedule(sport);
 
+        // An empty result can mean an API failure or an unpublished schedule.
+        // Keep existing jobs and the existing game counter rather than wiping them.
+        if (schedule.events.length === 0) {
+          logger.warn(
+            LOG,
+            `No events returned for ${sport}, keeping existing jobs`,
+          );
+          for (const key of this.scheduledGames.keys()) {
+            if (key.startsWith(`${sport}_`)) validKeys.add(key);
+          }
+          continue;
+        }
+
+        this.gameCounters[sport] = this.calculateGameCounter(schedule);
+        logger.info(
+          LOG,
+          `Refreshed ${sport} — already played games: ${this.gameCounters[sport]}`,
+        );
+
         for (const game of schedule.events) {
-          if (!this.isFutureGame(game)) continue;
+          try {
+            if (!this.isFutureGame(game)) continue;
 
-          const key = this.gameKey(sport, game.id);
-          validKeys.add(key);
-          this.scheduledGames.set(key, { game, sport });
+            const key = this.gameKey(sport, game.id);
+            validKeys.add(key);
+            this.scheduledGames.set(key, { game, sport });
 
-          if (threadManager) {
-            this.ensureGameDayTask(key, sport, game, threadManager);
-            this.ensureGameStartTask(key, sport, game, threadManager);
+            if (threadManager) {
+              this.ensureGameDayTask(key, sport, game, threadManager);
+              this.ensureGameStartTask(key, sport, game, threadManager);
+            }
+          } catch (error) {
+            logger.error(
+              LOG,
+              `Error scheduling ${sport} game ${game.name}`,
+              error,
+            );
           }
         }
       } catch (error) {
@@ -82,7 +110,11 @@ export class ScheduleManager {
     this.removeObsoleteTasks(validKeys);
   }
 
-  public addGameDayTask(sport: Sport, game: Game, threadManager: ThreadManager): boolean {
+  public addGameDayTask(
+    sport: Sport,
+    game: Game,
+    threadManager: ThreadManager,
+  ): boolean {
     const key = this.gameKey(sport, game.id);
     if (this.gameDayTasks.has(key)) return false;
 
@@ -112,7 +144,6 @@ export class ScheduleManager {
   public getScheduledGamesBySport(sport: Sport): TodayGame[] {
     return this.getScheduledGames().filter((entry) => entry.sport === sport);
   }
-
 
   public async getTodaysGames(): Promise<TodayGame[]> {
     const todaysGames: TodayGame[] = [];
@@ -156,7 +187,10 @@ export class ScheduleManager {
     );
 
     this.gameDayTasks.set(key, task);
-    logger.info(LOG, `Scheduled game day job: ${sport} ${game.id} at ${cronExpr}`);
+    logger.info(
+      LOG,
+      `Scheduled game day job: ${sport} ${game.id} at ${cronExpr}`,
+    );
   }
 
   private ensureGameStartTask(
@@ -166,6 +200,7 @@ export class ScheduleManager {
     threadManager: ThreadManager,
   ): void {
     if (this.gameStartTasks.has(key)) return;
+    if (game.competitions?.[0]?.timeValid === false) return;
 
     const cronExpr = this.gameStartCron(game.date);
     if (!cronExpr) return;
@@ -180,7 +215,10 @@ export class ScheduleManager {
     );
 
     this.gameStartTasks.set(key, task);
-    logger.info(LOG, `Scheduled game start notification: ${sport} ${game.id} at ${cronExpr}`);
+    logger.info(
+      LOG,
+      `Scheduled game start notification: ${sport} ${game.id} at ${cronExpr}`,
+    );
   }
 
   private removeObsoleteTasks(validKeys: Set<string>): void {
@@ -199,7 +237,10 @@ export class ScheduleManager {
   private async refreshSportSchedule(sport: Sport): Promise<void> {
     const schedule = await this.espnApi.fetchSchedule(sport);
     this.gameCounters[sport] = this.calculateGameCounter(schedule);
-    logger.info(LOG, `Refreshed ${sport} — game count: ${this.gameCounters[sport]}`);
+    logger.info(
+      LOG,
+      `Refreshed ${sport} — game count: ${this.gameCounters[sport]}`,
+    );
   }
 
   private calculateGameCounter(schedule: ScheduleData): number {
@@ -237,7 +278,7 @@ export class ScheduleManager {
       day: "numeric",
       hour: "numeric",
       minute: "numeric",
-      hour12: false,
+      hourCycle: "h23",
     });
     const parts = formatter.formatToParts(date);
     return {

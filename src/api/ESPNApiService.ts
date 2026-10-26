@@ -34,8 +34,8 @@ export class ESPNApiService {
 
     const season = this.getCurrentSeason(sport);
     // Football: https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams/2306/schedule?season=2026
-    // Men's basketball: https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/teams/2306/schedule?season=2026
-    // Women's basketball: https://site.api.espn.com/apis/site/v2/sports/basketball/womens-college-basketball/teams/2306/schedule?season=2026
+    // Men's basketball: https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/teams/2306/schedule?season=2027
+    // Women's basketball: https://site.api.espn.com/apis/site/v2/sports/basketball/womens-college-basketball/teams/2306/schedule?season=2027
     const url = `${config.ESPN_BASE_URL}/${meta.espnPath}/teams/${config.KSU_TEAM_ID}/schedule?season=${season}`;
 
     try {

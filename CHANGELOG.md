@@ -1,5 +1,9 @@
 # Version Changelog
 
+## 1.0.7
+
+- Added a local copy for basketball. Additionally added more logging and fixed errors on unscheduled games so the daily threads still schedule even if there isn't a game time.
+
 ## 1.0.6
 
 - Added a local copy of espn's api json since railway IP appears to be banned (403s). This is a temp workaround while I figure out how to self host

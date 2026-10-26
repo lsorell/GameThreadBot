@@ -10,6 +10,7 @@ export interface Game {
   competitions: Array<{
     id: string;
     date: string;
+    timeValid?: boolean;
     competitors: Array<{
       team: {
         displayName: string;
