@@ -3,12 +3,20 @@ import { config, SPORT_METADATA } from "../config";
 import { Sport, ScheduleData } from "../types";
 import { logger } from "../utils/logger";
 import footballSchedule from "../data/football-schedule-2306-2026.json";
+import mensBasketballSchedule from "../data/mens-basketball-schedule-2306-2026.json";
+import womensBasketballSchedule from "../data/womens-basketball-schedule-2306-2026.json";
 
 const LOG = "ESPNApi";
 
 // Temporary fallback to local file while figuring out how to self host
 const LOCAL_FALLBACK: Partial<Record<Sport, ScheduleData>> = {
   [config.SPORTS.FOOTBALL]: { events: footballSchedule.events || [] },
+  [config.SPORTS.MENS_BASKETBALL]: {
+    events: mensBasketballSchedule.events || [],
+  },
+  [config.SPORTS.WOMENS_BASKETBALL]: {
+    events: womensBasketballSchedule.events || [],
+  },
 };
 
 export class ESPNApiService {
@@ -26,6 +34,8 @@ export class ESPNApiService {
 
     const season = this.getCurrentSeason(sport);
     // Football: https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams/2306/schedule?season=2026
+    // Men's basketball: https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/teams/2306/schedule?season=2026
+    // Women's basketball: https://site.api.espn.com/apis/site/v2/sports/basketball/womens-college-basketball/teams/2306/schedule?season=2026
     const url = `${config.ESPN_BASE_URL}/${meta.espnPath}/teams/${config.KSU_TEAM_ID}/schedule?season=${season}`;
 
     try {
