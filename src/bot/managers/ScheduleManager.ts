@@ -181,7 +181,7 @@ export class ScheduleManager {
       cronExpr,
       async () => {
         logger.info(LOG, `Game day thread check: ${sport} game ${game.id}`);
-        await threadManager.checkAndCreateTodayThreads();
+        await threadManager.createGameThread(game, sport);
       },
       { scheduled: true, timezone: config.TIMEZONE },
     );

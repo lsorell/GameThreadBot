@@ -8,7 +8,16 @@ import womensBasketballSchedule from "../data/womens-basketball-schedule-2306-20
 
 const LOG = "ESPNApi";
 
-// Temporary fallback to local file while figuring out how to self host
+const BROWSER_HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+  Accept: "application/json, text/plain, */*",
+  "Accept-Language": "en-US,en;q=0.9",
+  Referer: "https://www.espn.com/",
+  Origin: "https://www.espn.com",
+};
+
+// Fallback used only when the live ESPN request failes
 const LOCAL_FALLBACK: Partial<Record<Sport, ScheduleData>> = {
   [config.SPORTS.FOOTBALL]: { events: footballSchedule.events || [] },
   [config.SPORTS.MENS_BASKETBALL]: {
@@ -26,12 +35,6 @@ export class ESPNApiService {
       throw new Error(`Unknown sport: ${sport}`);
     }
 
-    const fallback = LOCAL_FALLBACK[sport];
-    if (fallback) {
-      logger.info(LOG, `Using local fallback file for ${sport} schedule`);
-      return fallback;
-    }
-
     const season = this.getCurrentSeason(sport);
     // Football: https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams/2306/schedule?season=2026
     // Men's basketball: https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/teams/2306/schedule?season=2027
@@ -42,7 +45,7 @@ export class ESPNApiService {
       logger.info(LOG, `Fetching ${sport} schedule (season ${season})`);
       const response = await axios.get(url, {
         timeout: 10000,
-        headers: { "User-Agent": "3MAW-Discord-Bot/1.0" },
+        headers: BROWSER_HEADERS,
       });
 
       return { events: response.data.events || [] };
@@ -54,6 +57,13 @@ export class ESPNApiService {
           `Status: ${error.response?.status}, Message: ${error.message}`,
         );
       }
+
+      const fallback = LOCAL_FALLBACK[sport];
+      if (fallback) {
+        logger.info(LOG, `Using local fallback file for ${sport} schedule`);
+        return fallback;
+      }
+
       return { events: [] };
     }
   }
@@ -81,7 +91,10 @@ export class ESPNApiService {
   public async testConnection(): Promise<boolean> {
     try {
       const url = `${config.ESPN_BASE_URL}/football/college-football/teams/${config.KSU_TEAM_ID}`;
-      const response = await axios.get(url, { timeout: 5000 });
+      const response = await axios.get(url, {
+        timeout: 5000,
+        headers: BROWSER_HEADERS,
+      });
       return response.status === 200;
     } catch (error) {
       logger.error(LOG, "ESPN API connection test failed", error);

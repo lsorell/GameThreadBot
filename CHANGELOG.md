@@ -1,5 +1,10 @@
 # Version Changelog
 
+## 1.0.8
+
+- Fixed a bug where when 2 or more games were scheduled on the same day, the bot would create multiple game threads.
+- Changed the headers to the espn api so the bot will hopefully be able to regain access
+
 ## 1.0.7
 
 - Added a local copy for basketball. Additionally added more logging and fixed errors on unscheduled games so the daily threads still schedule even if there isn't a game time.
